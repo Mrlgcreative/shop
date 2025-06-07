@@ -1,0 +1,56 @@
+Pas de souci ! Révisons et corrigeons le script de suppression pour nous assurer qu'il fonctionne correctement. Nous allons vérifier chaque étape pour nous assurer que l'article est bien supprimé et que l'historique est mis à jour.
+
+Vérification du Script de Suppression
+
+*supprimer.php*
+
+Assurons-nous que le script de suppression vérifie correctement l'existence de l'article, supprime l'article et enregistre l'action dans l'historique.
+
+php
+<?php
+include 'config.php';
+
+$id = $_GET['id'];
+$article_result = $conn->query("SELECT * FROM Articles WHERE id=$id");
+
+if ($article_result->num_rows > 0) {
+    $article = $article_result->fetch_assoc();
+    $prix = $article['prix'];
+
+    $sql = "DELETE FROM Articles WHERE id=$id";
+    if ($conn->query($sql) === TRUE) {
+        // Ajouter l'entrée dans l'historique
+        $action = 'Suppression';
+        $quantité = 0; // Quantité supprimée
+        $stmt_hist = $conn->prepare("INSERT INTO Historique (id_article, action, quantité, prix) VALUES (?, ?, ?, ?)");
+        $stmt_hist->bind_param("isid", $id, $action, $quantité, $prix);
+        $stmt_hist->execute();
+        $stmt_hist->close();
+
+        echo "Article supprimé avec succès";
+    } else {
+        echo "Erreur : " . $conn->error;
+    }
+} else {
+    echo "Erreur : Article non trouvé.";
+}
+
+$conn->close();
+header("Location: index.php");
+exit();
+?>
+
+
+Points à Vérifier
+
+1. URL de Suppression : Assure-toi que l'URL de suppression inclut correctement l'ID de l'article à supprimer, par exemple supprimer.php?id=1.
+
+2. Permissions de la Base de Données : Vérifie que l'utilisateur de la base de données a les permissions nécessaires pour effectuer des opérations de suppression.
+
+3. Connexion à la Base de Données : Assure-toi que la connexion à la base de données est correctement établie dans config.php.
+
+Exemple d'Utilisation
+
+Pour supprimer un article, l'URL doit ressembler à ceci : http://localhost/shop/supprimer.php?id=1
+
+En suivant ces étapes, le script de suppression devrait fonctionner correctement et enregistrer l'action dans l'historique. Si tu rencontres toujours des problèmes, fais-le moi savoir et nous examinerons plus en détail ce qui pourrait ne pas fonctionner. 😊
