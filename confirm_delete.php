@@ -249,7 +249,7 @@ $conn->close();
                         <div class="article-meta">
                             <div class="meta-item">
                                 <span class="meta-label">Prix</span>
-                                <span class="meta-value"><?php echo number_format($article['prix'], 2); ?> €</span>
+                                <span class="meta-value"><?php echo number_format($article['prix'], 2); ?> FC</span>
                             </div>
                             <div class="meta-item">
                                 <span class="meta-label">Stock</span>
@@ -257,7 +257,7 @@ $conn->close();
                             </div>
                             <div class="meta-item">
                                 <span class="meta-label">Valeur totale</span>
-                                <span class="meta-value"><?php echo number_format($article['prix'] * $article['quantité'], 2); ?> €</span>
+                                <span class="meta-value"><?php echo number_format($article['prix'] * $article['quantité'], 2); ?> FC</span>
                             </div>
                         </div>
                     </div>

@@ -112,15 +112,16 @@ CREATE TABLE `ventes` (
   `id_article` int(11) NOT NULL,
   `quantité` int(11) NOT NULL,
   `date` datetime NOT NULL DEFAULT current_timestamp(),
-  `prix` decimal(10,2) NOT NULL
+  `prix` decimal(10,2) NOT NULL,
+  `remise` varchar(10) NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `ventes`
 --
 
-INSERT INTO `ventes` (`id`, `id_article`, `quantité`, `date`, `prix`) VALUES
-(52, 10, 32, '2025-02-03 23:45:59', 2000.00);
+INSERT INTO `ventes` (`id`, `id_article`, `quantité`, `date`, `prix`, `remise`) VALUES
+(52, 10, 32, '2025-02-03 23:45:59', 2000.00, NULL);
 
 --
 -- Index pour les tables déchargées

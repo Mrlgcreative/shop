@@ -37,7 +37,7 @@ if ($result->num_rows > 0) {
     
     try {
         // 1. D'abord ajouter une entrée dans l'historique pour tracer la suppression (avant de supprimer l'article)
-        $action = 'Suppression article: ' . $nom . ' (Qté: ' . $quantité_actuelle . ', Prix: ' . $prix . '€)';
+        $action = 'Suppression article: ' . $nom . ' (Qté: ' . $quantité_actuelle . ', Prix: ' . $prix . ' FC)';
         $stmt_hist = $conn->prepare("INSERT INTO Historique (id_article, action, quantité, prix) VALUES (?, ?, ?, ?)");
         $stmt_hist->bind_param("isid", $id, $action, $quantité_actuelle, $prix);
         $stmt_hist->execute();

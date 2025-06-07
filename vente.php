@@ -14,10 +14,14 @@ $messageType = '';
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['vente'])) {
     $id_article = $_POST["id_article"];
     $quantité = $_POST["quantité"];
+    $remise = isset($_POST["remise"]) ? floatval($_POST["remise"]) : 0;
     
     // Validation des données
     if (empty($id_article) || empty($quantité) || $quantité <= 0) {
         $message = "Veuillez remplir tous les champs avec des valeurs valides.";
+        $messageType = "error";
+    } else if ($remise < 0 || $remise > 100) {
+        $message = "La remise doit être entre 0 et 100%.";
         $messageType = "error";
     } else {
         // Récupérer le prix et stock de l'article
@@ -38,12 +42,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['vente'])) {
             } else {                // Commencer une transaction
                 $conn->begin_transaction();
                 try {
-                    // Calculer le total
-                    $total = $prix * $quantité;
+                    // Calculer le total avec remise
+                    $total_avant_remise = $prix * $quantité;
+                    $montant_remise = ($total_avant_remise * $remise) / 100;
+                    $total = $total_avant_remise - $montant_remise;
                     
-                    // Enregistrer la vente (utilise les vrais noms de colonnes de la DB)
-                    $stmt_vente = $conn->prepare("INSERT INTO ventes (id_article, quantité, prix) VALUES (?, ?, ?)");
-                    $stmt_vente->bind_param("iid", $id_article, $quantité, $total);
+                    // Enregistrer la vente avec remise
+                    $remise_str = $remise > 0 ? $remise . '%' : null;
+                    $stmt_vente = $conn->prepare("INSERT INTO ventes (id_article, quantité, prix, remise) VALUES (?, ?, ?, ?)");
+                    $stmt_vente->bind_param("iids", $id_article, $quantité, $total, $remise_str);
                     $stmt_vente->execute();
                     
                     // Mettre à jour le stock
@@ -58,11 +65,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['vente'])) {
                     $stmt_hist = $conn->prepare("INSERT INTO historique (id_article, action, quantité, prix, reduction) VALUES (?, ?, ?, ?, ?)");
                     $stmt_hist->bind_param("isidd", $id_article, $action, $quantité, $total, $reduction);
                     $stmt_hist->execute();
-                    
-                    // Valider la transaction
+                      // Valider la transaction
                     $conn->commit();
                     
-                    $message = "Vente enregistrée avec succès ! Total: " . number_format($total, 2) . " FC";
+                    $message_remise = $remise > 0 ? " (Remise: {$remise}%, Économie: " . number_format($montant_remise, 2) . " FC)" : "";
+                    $message = "Vente enregistrée avec succès ! Total: " . number_format($total, 2) . " FC" . $message_remise;
                     $messageType = "success";
                     
                     // Nettoyer les statements
@@ -253,8 +260,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
                                     }
                                     ?>
                                 </select>
-                            </div>
-                              <div class="form-group">
+                            </div>                            <div class="form-group">
                                 <label for="quantité" class="form-label">📊 Quantité</label>
                                 <input type="number" id="quantité" name="quantité" min="1" 
                                        placeholder="Quantité à vendre" class="form-input" required>
@@ -263,11 +269,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
                                 </div>
                             </div>
 
-                            <!-- Prévisualisation améliorée du total -->
+                            <div class="form-group">
+                                <label for="remise" class="form-label">🏷️ Remise (%)</label>
+                                <input type="number" id="remise" name="remise" min="0" max="100" step="0.1" 
+                                       placeholder="Remise en pourcentage (optionnel)" class="form-input" value="0">
+                                <small class="text-muted">💡 Saisissez un pourcentage entre 0 et 100</small>
+                            </div>                            <!-- Prévisualisation améliorée du total -->
                             <div class="total-preview" id="totalPreview" style="display: none;">
                                 <div class="total-info">
                                     <div>
-                                        <span class="total-label">💰 Total estimé</span>
+                                        <span class="total-label">💰 Total à payer</span>
                                     </div>
                                     <div>
                                         <span class="total-amount" id="totalAmount">0.00 FC</span>
@@ -416,17 +427,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
                 totalPreview.style.display = 'none';
                 quantityInput.max = '';
             }
-        }
-
-        function updateTotal() {
+        }        function updateTotal() {
             const selectedOption = articleSelect.options[articleSelect.selectedIndex];
             const quantity = parseInt(quantityInput.value) || 0;
+            const remise = parseFloat(document.getElementById('remise').value) || 0;
             
             if (selectedOption.value && quantity > 0) {
                 const price = parseFloat(selectedOption.dataset.price);
-                const total = price * quantity;
+                const totalAvantRemise = price * quantity;
+                const montantRemise = (totalAvantRemise * remise) / 100;
+                const total = totalAvantRemise - montantRemise;
                 
-                totalAmount.textContent = total.toFixed(2) + ' FC';
+                if (remise > 0) {
+                    totalAmount.innerHTML = `
+                        <div style="font-size: 0.9em; color: #888; text-decoration: line-through;">
+                            ${totalAvantRemise.toFixed(2)} FC
+                        </div>
+                        <div style="font-weight: bold; color: #28a745;">
+                            ${total.toFixed(2)} FC
+                        </div>
+                        <div style="font-size: 0.8em; color: #17a2b8;">
+                            Économie: ${montantRemise.toFixed(2)} FC (${remise}%)
+                        </div>
+                    `;
+                } else {
+                    totalAmount.textContent = total.toFixed(2) + ' FC';
+                }
+                
                 totalPreview.style.display = 'block';
             } else {
                 totalPreview.style.display = 'none';
@@ -435,6 +462,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
 
         articleSelect.addEventListener('change', updateStockInfo);
         quantityInput.addEventListener('input', updateTotal);
+        document.getElementById('remise').addEventListener('input', updateTotal);
 
         // Auto-hide des messages
         const alertMessage = document.getElementById('alert-message');
@@ -457,16 +485,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
                 card.style.opacity = '1';
                 card.style.transform = 'translateY(0)';
             }, index * 100);
-        });
-
-        // Validation du formulaire
+        });        // Validation du formulaire
         document.getElementById('saleForm').addEventListener('submit', function(e) {
             const articleId = document.getElementById('id_article').value;
             const quantity = parseInt(document.getElementById('quantité').value);
+            const remise = parseFloat(document.getElementById('remise').value) || 0;
             
             if (!articleId) {
                 e.preventDefault();
                 alert('Veuillez sélectionner un article.');
+                return;
+            }
+            
+            if (remise < 0 || remise > 100) {
+                e.preventDefault();
+                alert('La remise doit être comprise entre 0 et 100%.');
                 return;
             }
             

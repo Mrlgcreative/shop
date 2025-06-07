@@ -5,6 +5,7 @@
         color: #fff;
         padding: 40px 0 20px;
         margin-top: auto;
+        border-radius: 10px;
     }
 
     .footer-container {
@@ -46,7 +47,7 @@
         padding: 5px;
     }
 
-    .col-3 {
+    .col-1 {
         display: flex;
         justify-content: center;
         align-items: center;
@@ -96,7 +97,7 @@
         <div class="footer-content">
             
 
-            <div class="footer-links col-3">
+            <div class="footer-links col-1">
                 <div class="footer-section">
                     <h4>Navigation</h4>
                     <ul>
@@ -106,7 +107,7 @@
                     </ul>
                 </div>
 
-                <div class="col-3">
+                <div class="col-1">
                     <div class="footer-section">
                         <h4>Informations</h4>
                         <ul>
@@ -117,7 +118,7 @@
                     </div>
                 </div>
 
-                <div class="col-3">
+                <div class="col-1">
                     <div class="footer-section ">
                         <h4>Services</h4>
                         <ul>
@@ -128,16 +129,17 @@
                     </div>
                 </div>
 
-                 <div class="col-3">
+                 <div class="col-1">
                 <div class="footer-section">
                     <h4>Contact</h4>
                     <p>Email: contact@skyboardsoft.com</p>
                     <p>Téléphone: +243 97 90 99 031</p>
                 </div>
             </div>
+             <p>&copy; <?php echo date('Y'); ?> Skyboard Soft. Tous droits réservés.</p>
             </div>
 
-            <p>&copy; <?php echo date('Y'); ?> Skyboard Soft. Tous droits réservés.</p>
+           
         </div>
     </div>
     </div>

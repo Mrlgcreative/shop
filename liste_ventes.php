@@ -8,8 +8,8 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Récupérer les ventes avec prepared statement pour la sécurité
-$sql = "SELECT Ventes.id, Articles.nom, Ventes.quantité, Ventes.prix, 
-               (Ventes.quantité * Ventes.prix) as total, Ventes.date 
+$sql = "SELECT Ventes.id, Articles.nom, Ventes.quantité, Ventes.prix, Ventes.remise,
+               Ventes.prix as total, Ventes.date 
         FROM Ventes 
         JOIN Articles ON Ventes.id_article = Articles.id 
         ORDER BY Ventes.date DESC";
@@ -28,7 +28,7 @@ if ($result->num_rows > 0) {
 
 // Calculer les totaux journaliers
 $sql_daily = "SELECT DATE(Ventes.date) as date_jour, 
-                     SUM(Ventes.quantité * Ventes.prix) as total_jour,
+                     SUM(Ventes.prix) as total_jour,
                      COUNT(*) as nombre_ventes,
                      SUM(Ventes.quantité) as articles_vendus
               FROM Ventes 
@@ -469,6 +469,7 @@ $conn->close();
                                     <th>📦 Article</th>
                                     <th>📊 Qté</th>
                                     <th>💰 Prix Unit.</th>
+                                    <th>🏷️ Remise</th>
                                     <th>💵 Total</th>
                                     <th>📅 Date & Heure</th>
                                 </tr>
@@ -484,9 +485,28 @@ $conn->close();
                                             </td>
                                             <td>
                                                 <span class="quantity-badge"><?php echo htmlspecialchars($row['quantité']); ?></span>
-                                            </td>
-                                            <td class="price">
-                                                <?php echo number_format($row['prix'], 2); ?> FC
+                                            </td>                                            <td class="price">
+                                                <?php 
+                                                // Calcul du prix unitaire avant remise si une remise a été appliquée
+                                                $prix_unitaire = $row['prix'] / $row['quantité'];
+                                                echo number_format($prix_unitaire, 2); 
+                                                ?> FC
+                                            </td>                                            <td class="discount">
+                                                <?php 
+                                                if (!empty($row['remise'])) {
+                                                    // Calculer le montant de la remise en FC
+                                                    $pourcentage_remise = floatval(str_replace('%', '', $row['remise']));
+                                                    $prix_unitaire = $row['prix'] / $row['quantité'];
+                                                    
+                                                    // Retrouver le prix unitaire avant remise
+                                                    $prix_avant_remise = $prix_unitaire / (1 - ($pourcentage_remise / 100));
+                                                    $montant_remise = ($prix_avant_remise * $row['quantité'] * $pourcentage_remise) / 100;
+                                                    
+                                                    echo number_format($montant_remise, 2) . ' FC';
+                                                } else {
+                                                    echo '-';
+                                                }
+                                                ?>
                                             </td>
                                             <td class="total-amount">
                                                 <?php echo number_format($row['total'], 2); ?> FC
@@ -499,7 +519,7 @@ $conn->close();
                                     <?php endwhile; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="6" class="empty-state">
+                                        <td colspan="7" class="empty-state">
                                             <div class="empty-icon">📭</div>
                                             <h3>Aucune vente enregistrée</h3>
                                             <p>Commencez par effectuer votre première vente</p>
