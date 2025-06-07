@@ -32,15 +32,16 @@ CREATE TABLE `articles` (
   `nom` varchar(100) NOT NULL,
   `description` text DEFAULT NULL,
   `prix` decimal(10,2) NOT NULL,
-  `quantité` int(11) NOT NULL
+  `quantité` int(11) NOT NULL,
+  `devise` enum('FC','USD') NOT NULL DEFAULT 'FC'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `articles`
 --
 
-INSERT INTO `articles` (`id`, `nom`, `description`, `prix`, `quantité`) VALUES
-(10, 'iphone', '16pro max', 9000.00, 33);
+INSERT INTO `articles` (`id`, `nom`, `description`, `prix`, `quantité`, `devise`) VALUES
+(10, 'iphone', '16pro max', 9000.00, 33, 'FC');
 
 -- --------------------------------------------------------
 
@@ -56,17 +57,18 @@ CREATE TABLE `historique` (
   `quantité` int(11) NOT NULL,
   `prix` decimal(10,2) NOT NULL,
   `reduction` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `réduction` decimal(10,2) NOT NULL DEFAULT 0.00
+  `réduction` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `devise` enum('FC','USD') NOT NULL DEFAULT 'FC'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `historique`
 --
 
-INSERT INTO `historique` (`id`, `id_article`, `action`, `date`, `quantité`, `prix`, `reduction`, `réduction`) VALUES
-(24, 10, 'Ajout', '2025-02-03 23:45:24', 65, 2660.00, 0.00, 0.00),
-(25, 10, 'Vente', '2025-02-03 23:45:59', 32, 2000.00, 0.00, 660.00),
-(26, 10, 'Modification', '2025-02-04 08:51:44', 33, 9000.00, 0.00, 0.00);
+INSERT INTO `historique` (`id`, `id_article`, `action`, `date`, `quantité`, `prix`, `reduction`, `réduction`, `devise`) VALUES
+(24, 10, 'Ajout', '2025-02-03 23:45:24', 65, 2660.00, 0.00, 0.00, 'FC'),
+(25, 10, 'Vente', '2025-02-03 23:45:59', 32, 2000.00, 0.00, 660.00, 'FC'),
+(26, 10, 'Modification', '2025-02-04 08:51:44', 33, 9000.00, 0.00, 0.00, 'FC');
 
 -- --------------------------------------------------------
 
@@ -113,15 +115,16 @@ CREATE TABLE `ventes` (
   `quantité` int(11) NOT NULL,
   `date` datetime NOT NULL DEFAULT current_timestamp(),
   `prix` decimal(10,2) NOT NULL,
-  `remise` varchar(10) NULL
+  `remise` varchar(10) NULL,
+  `devise` enum('FC','USD') NOT NULL DEFAULT 'FC'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Déchargement des données de la table `ventes`
 --
 
-INSERT INTO `ventes` (`id`, `id_article`, `quantité`, `date`, `prix`, `remise`) VALUES
-(52, 10, 32, '2025-02-03 23:45:59', 2000.00, NULL);
+INSERT INTO `ventes` (`id`, `id_article`, `quantité`, `date`, `prix`, `remise`, `devise`) VALUES
+(52, 10, 32, '2025-02-03 23:45:59', 2000.00, NULL, 'FC');
 
 --
 -- Index pour les tables déchargées

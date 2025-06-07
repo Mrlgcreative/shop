@@ -18,10 +18,14 @@ $stats['total_articles'] = $result->fetch_assoc()['total'];
 $result = $conn->query("SELECT COUNT(*) as total FROM Ventes");
 $stats['total_ventes'] = $result->fetch_assoc()['total'];
 
-// Chiffre d'affaires total
-$result = $conn->query("SELECT SUM(prix * quantité) as total FROM Ventes");
-$ca_total = $result->fetch_assoc()['total'];
-$stats['chiffre_affaires'] = $ca_total ? $ca_total : 0;
+// Chiffre d'affaires total par devise
+$result_fc = $conn->query("SELECT SUM(prix * quantité) as total FROM Ventes WHERE devise = 'FC' OR devise IS NULL");
+$ca_total_fc = $result_fc->fetch_assoc()['total'];
+$stats['chiffre_affaires_fc'] = $ca_total_fc ? $ca_total_fc : 0;
+
+$result_usd = $conn->query("SELECT SUM(prix * quantité) as total FROM Ventes WHERE devise = 'USD'");
+$ca_total_usd = $result_usd->fetch_assoc()['total'];
+$stats['chiffre_affaires_usd'] = $ca_total_usd ? $ca_total_usd : 0;
 
 // Articles en rupture de stock
 $result = $conn->query("SELECT COUNT(*) as total FROM Articles WHERE quantité = 0");
@@ -35,32 +39,38 @@ $stats['stock_faible'] = $result->fetch_assoc()['total'];
 $result = $conn->query("SELECT COUNT(*) as total FROM Ventes WHERE MONTH(date) = MONTH(CURRENT_DATE()) AND YEAR(date) = YEAR(CURRENT_DATE())");
 $stats['ventes_mois'] = $result->fetch_assoc()['total'];
 
-// CA du mois en cours
-$result = $conn->query("SELECT SUM(prix * quantité) as total FROM Ventes WHERE MONTH(date) = MONTH(CURRENT_DATE()) AND YEAR(date) = YEAR(CURRENT_DATE())");
-$ca_mois = $result->fetch_assoc()['total'];
-$stats['ca_mois'] = $ca_mois ? $ca_mois : 0;
+// CA du mois en cours par devise
+$result_fc_mois = $conn->query("SELECT SUM(prix * quantité) as total FROM Ventes WHERE MONTH(date) = MONTH(CURRENT_DATE()) AND YEAR(date) = YEAR(CURRENT_DATE()) AND (devise = 'FC' OR devise IS NULL)");
+$ca_mois_fc = $result_fc_mois->fetch_assoc()['total'];
+$stats['ca_mois_fc'] = $ca_mois_fc ? $ca_mois_fc : 0;
 
-// Top 5 des articles les plus vendus
+$result_usd_mois = $conn->query("SELECT SUM(prix * quantité) as total FROM Ventes WHERE MONTH(date) = MONTH(CURRENT_DATE()) AND YEAR(date) = YEAR(CURRENT_DATE()) AND devise = 'USD'");
+$ca_mois_usd = $result_usd_mois->fetch_assoc()['total'];
+$stats['ca_mois_usd'] = $ca_mois_usd ? $ca_mois_usd : 0;
+
+// Top 5 des articles les plus vendus avec devise
 $top_articles = $conn->query("
-    SELECT a.nom, a.prix, SUM(v.quantité) as total_vendu, SUM(v.prix * v.quantité) as ca_article
+    SELECT a.nom, a.prix, a.devise as article_devise, SUM(v.quantité) as total_vendu, SUM(v.prix * v.quantité) as ca_article, v.devise as vente_devise
     FROM Articles a 
     JOIN Ventes v ON a.id = v.id_article
-    GROUP BY a.id, a.nom, a.prix 
+    GROUP BY a.id, a.nom, a.prix, a.devise, v.devise 
     ORDER BY total_vendu DESC 
     LIMIT 5
 ");
 
-// Articles en rupture ou stock faible
+// Articles en rupture ou stock faible avec devise
 $articles_alerte = $conn->query("
-    SELECT id, nom, quantité, prix 
+    SELECT id, nom, quantité, prix, devise 
     FROM Articles 
     WHERE quantité <= 5 
     ORDER BY quantité ASC
 ");
 
-// Évolution des ventes (7 derniers jours)
+// Évolution des ventes (7 derniers jours) par devise
 $ventes_evolution = $conn->query("
-    SELECT DATE(date) as date, COUNT(*) as nb_ventes, SUM(prix * quantité) as ca_jour
+    SELECT DATE(date) as date, COUNT(*) as nb_ventes, 
+           SUM(CASE WHEN devise = 'FC' OR devise IS NULL THEN prix * quantité ELSE 0 END) as ca_jour_fc,
+           SUM(CASE WHEN devise = 'USD' THEN prix * quantité ELSE 0 END) as ca_jour_usd
     FROM Ventes 
     WHERE date >= DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY)
     GROUP BY DATE(date)
@@ -337,8 +347,7 @@ $ventes_evolution = $conn->query("
             <div class="section-title">
                 <h2>📈 Performance du mois</h2>
             </div>
-            
-            <div class="monthly-stats">
+              <div class="monthly-stats">
                 <div class="stat-card-mini success">
                     <div class="mini-icon">🎯</div>
                     <div class="mini-content">
@@ -348,10 +357,18 @@ $ventes_evolution = $conn->query("
                 </div>
 
                 <div class="stat-card-mini primary">
+                    <div class="mini-icon">💰</div>
+                    <div class="mini-content">
+                        <div class="mini-number"><?php echo number_format($stats['ca_mois_fc'], 2); ?> FC</div>
+                        <div class="mini-label">CA FC ce mois</div>
+                    </div>
+                </div>
+
+                <div class="stat-card-mini primary">
                     <div class="mini-icon">💵</div>
                     <div class="mini-content">
-                        <div class="mini-number"><?php echo number_format($stats['ca_mois'], 2); ?> FC</div>
-                        <div class="mini-label">CA ce mois</div>
+                        <div class="mini-number"><?php echo number_format($stats['ca_mois_usd'], 2); ?> USD</div>
+                        <div class="mini-label">CA USD ce mois</div>
                     </div>
                 </div>
 
@@ -362,7 +379,7 @@ $ventes_evolution = $conn->query("
                         <div class="mini-label">Stock faible</div>
                     </div>
                 </div>
-            </div>            <!-- Contenu organisé en tableaux -->
+            </div><!-- Contenu organisé en tableaux -->
             <div class="dashboard-content">
                 <!-- Section Top Articles en tableau -->
                 <div class="dashboard-section">
@@ -389,9 +406,11 @@ $ventes_evolution = $conn->query("
                                             </td>
                                             <td class="text-center">
                                                 <span class="quantity-badge"><?php echo $article['total_vendu']; ?></span>
-                                            </td>
-                                            <td class="text-right">
-                                                <span class="revenue-amount"><?php echo number_format($article['ca_article'], 2); ?> FC</span>
+                                            </td>                                            <td class="text-right">
+                                                <?php 
+                                                $devise = isset($article['vente_devise']) && !empty($article['vente_devise']) ? $article['vente_devise'] : 'FC'; 
+                                                ?>
+                                                <span class="revenue-amount"><?php echo number_format($article['ca_article'], 2) . ' ' . $devise; ?></span>
                                             </td>
                                         </tr>
                                         <?php $rank++; ?>
@@ -407,9 +426,7 @@ $ventes_evolution = $conn->query("
                             </tbody>
                         </table>
                     </div>
-                </div>
-
-                <!-- Section Evolution des ventes -->
+                </div>                <!-- Section Evolution des ventes -->
                 <div class="dashboard-section">
                     <h3>📈 Évolution des ventes (7 derniers jours)</h3>
                     <div class="table-container">
@@ -418,7 +435,8 @@ $ventes_evolution = $conn->query("
                                 <tr>
                                     <th>Date</th>
                                     <th>Nombre de ventes</th>
-                                    <th>Chiffre d'affaires</th>
+                                    <th>CA FC</th>
+                                    <th>CA USD</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -430,7 +448,10 @@ $ventes_evolution = $conn->query("
                                                 <span class="sales-count"><?php echo $evolution['nb_ventes']; ?></span>
                                             </td>
                                             <td class="text-right">
-                                                <span class="revenue-amount"><?php echo number_format($evolution['ca_jour'], 2); ?> FC</span>
+                                                <span class="revenue-amount"><?php echo number_format($evolution['ca_jour_fc'], 2); ?> FC</span>
+                                            </td>
+                                            <td class="text-right">
+                                                <span class="revenue-amount"><?php echo number_format($evolution['ca_jour_usd'], 2); ?> USD</span>
                                             </td>
                                         </tr>
                                     <?php endwhile; ?>
@@ -450,12 +471,12 @@ $ventes_evolution = $conn->query("
                 <!-- Section Alertes Stock en tableau -->
                 <div class="dashboard-section">
                     <h3>⚠️ Alertes de stock</h3>
-                    <div class="table-container">
-                        <table class="modern-table alert-table">
+                    <div class="table-container">                        <table class="modern-table alert-table">
                             <thead>
                                 <tr>
                                     <th>Statut</th>
                                     <th>Article</th>
+                                    <th>Prix</th>
                                     <th>Stock restant</th>
                                     <th>Action</th>
                                 </tr>
@@ -472,6 +493,12 @@ $ventes_evolution = $conn->query("
                                             <td class="article-name-cell">
                                                 <strong><?php echo htmlspecialchars($article['nom']); ?></strong>
                                             </td>
+                                            <td class="text-right">
+                                                <?php 
+                                                $devise_article = isset($article['devise']) && !empty($article['devise']) ? $article['devise'] : 'FC'; 
+                                                ?>
+                                                <span class="price-badge"><?php echo number_format($article['prix'], 2) . ' ' . $devise_article; ?></span>
+                                            </td>
                                             <td class="text-center">
                                                 <span class="stock-badge <?php echo $article['quantité'] == 0 ? 'critical' : 'warning'; ?>">
                                                     <?php echo $article['quantité']; ?>
@@ -486,7 +513,7 @@ $ventes_evolution = $conn->query("
                                     <?php endwhile; ?>
                                 <?php else: ?>
                                     <tr>
-                                        <td colspan="4" class="empty-state success">
+                                        <td colspan="5" class="empty-state success">
                                             <div class="empty-icon">✅</div>
                                             <p>Tous les stocks sont suffisants</p>
                                         </td>

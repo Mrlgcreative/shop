@@ -15,16 +15,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $description = htmlspecialchars($_POST['description']);
     $prix = $_POST['prix'];
     $quantité = $_POST['quantité'];
+    $devise = $_POST['devise'];
 
     // Utiliser prepared statements pour la sécurité
-    $stmt = $conn->prepare("UPDATE Articles SET nom=?, description=?, prix=?, quantité=? WHERE id=?");
-    $stmt->bind_param("ssdii", $nom, $description, $prix, $quantité, $id);
+    $stmt = $conn->prepare("UPDATE Articles SET nom=?, description=?, prix=?, quantité=?, devise=? WHERE id=?");
+    $stmt->bind_param("ssdisi", $nom, $description, $prix, $quantité, $devise, $id);
     
     if ($stmt->execute()) {
-        // Ajouter l'entrée dans l'historique
+        // Ajouter l'entrée dans l'historique avec la devise
         $action = 'Modification';
-        $stmt_hist = $conn->prepare("INSERT INTO Historique (id_article, action, quantité, prix) VALUES (?, ?, ?, ?)");
-        $stmt_hist->bind_param("isid", $id, $action, $quantité, $prix);
+        $stmt_hist = $conn->prepare("INSERT INTO Historique (id_article, action, quantité, prix, devise) VALUES (?, ?, ?, ?, ?)");
+        $stmt_hist->bind_param("isids", $id, $action, $quantité, $prix, $devise);
         $stmt_hist->execute();
         
         $message = "✅ Article mis à jour avec succès !";
@@ -107,11 +108,9 @@ $conn->close();
                         <label for="description">📄 Description</label>
                         <textarea id="description" name="description" 
                                   placeholder="Décrivez l'article en détail" required><?php echo htmlspecialchars($article['description']); ?></textarea>
-                    </div>
-
-                    <div class="form-row">
+                    </div>                    <div class="form-row">
                         <div class="form-group">
-                            <label for="prix">💰 Prix (FC)</label>
+                            <label for="prix" id="prixLabel">💰 Prix unitaire</label>
                             <input type="number" id="prix" name="prix" value="<?php echo htmlspecialchars($article['prix']); ?>" 
                                    step="0.01" min="0" placeholder="0.00" required>
                         </div>
@@ -121,6 +120,14 @@ $conn->close();
                             <input type="number" id="quantité" name="quantité" value="<?php echo htmlspecialchars($article['quantité']); ?>" 
                                    min="0" placeholder="0" required>
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="devise">💱 Devise</label>
+                        <select id="devise" name="devise" required>
+                            <option value="FC" <?php echo (isset($article['devise']) && $article['devise'] == 'FC') ? 'selected' : ''; ?>>🇨🇩 FC (Franc Congolais)</option>
+                            <option value="USD" <?php echo (isset($article['devise']) && $article['devise'] == 'USD') ? 'selected' : ''; ?>>🇺🇸 USD (Dollar Américain)</option>
+                        </select>
                     </div>
 
                     <div class="form-actions">
@@ -160,8 +167,7 @@ $conn->close();
             submitBtn.innerHTML = '⏳ Modification en cours...';
         });
 
-        // Auto-hide des messages après 5 secondes
-        const messages = document.querySelectorAll('.message');
+        // Auto-hide des messages après 5 secondes        const messages = document.querySelectorAll('.message');
         messages.forEach(message => {
             setTimeout(() => {
                 message.style.animation = 'fadeOut 0.5s ease-in forwards';
@@ -170,6 +176,28 @@ $conn->close();
                 }, 500);
             }, 5000);
         });
+
+        // JavaScript pour changer le label du prix selon la devise
+        const deviseSelect = document.getElementById('devise');
+        const prixLabel = document.getElementById('prixLabel');
+        const prixInput = document.getElementById('prix');
+
+        function updatePrixLabel() {
+            const selectedDevise = deviseSelect.value;
+            if (selectedDevise === 'USD') {
+                prixLabel.innerHTML = '💰 Prix unitaire (USD)';
+                prixInput.placeholder = '0.00 USD';
+            } else {
+                prixLabel.innerHTML = '💰 Prix unitaire (FC)';
+                prixInput.placeholder = '0.00 FC';
+            }
+        }
+
+        // Initialiser au chargement
+        updatePrixLabel();
+
+        // Écouter les changements
+        deviseSelect.addEventListener('change', updatePrixLabel);
     </script>
 </body>
 </html>

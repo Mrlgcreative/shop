@@ -16,16 +16,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $description = htmlspecialchars($_POST['description']);
     $prix = $_POST['prix'];
     $quantité = $_POST['quantité'];
+    $devise = isset($_POST['devise']) ? $_POST['devise'] : 'FC';
 
-    $stmt = $conn->prepare("INSERT INTO Articles (nom, description, prix, quantité) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssdi", $nom, $description, $prix, $quantité);
+    $stmt = $conn->prepare("INSERT INTO Articles (nom, description, prix, quantité, devise) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssdis", $nom, $description, $prix, $quantité, $devise);
     
-    if ($stmt->execute()) {
-        // Ajouter l'entrée dans l'historique
+    if ($stmt->execute()) {        // Ajouter l'entrée dans l'historique
         $id_article = $conn->insert_id;
         $action = 'Ajout';
-        $stmt_hist = $conn->prepare("INSERT INTO Historique (id_article, action, quantité, prix) VALUES (?, ?, ?, ?)");
-        $stmt_hist->bind_param("isid", $id_article, $action, $quantité, $prix);
+        $stmt_hist = $conn->prepare("INSERT INTO Historique (id_article, action, quantité, prix, devise) VALUES (?, ?, ?, ?, ?)");
+        $stmt_hist->bind_param("isids", $id_article, $action, $quantité, $prix, $devise);
         $stmt_hist->execute();
         $stmt_hist->close();
         
@@ -51,9 +51,36 @@ $conn->close();
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="shop/modern-style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛍️</text></svg>">
+    <style>
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .form-group select {
+            background-color: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .form-group select:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            outline: none;
+        }
+        
+        .form-group select option {
+            padding: 8px;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body class="page-transition">  
 <div class="container">
@@ -100,15 +127,23 @@ $conn->close();
                         <label for="description">📄 Description détaillée</label>
                         <textarea id="description" name="description" 
                                   placeholder="Décrivez l'article en détail (couleur, caractéristiques, état...)" required></textarea>
-                    </div>
-
-                    <div class="form-row">
+                    </div>                    <div class="form-row">
                         <div class="form-group">
-                            <label for="prix">💰 Prix unitaire (FC)</label>
+                            <label for="prix">💰 Prix unitaire</label>
                             <input type="number" id="prix" name="prix" 
                                    step="0.01" min="0" placeholder="0.00" required>
                         </div>
 
+                        <div class="form-group">
+                            <label for="devise">💱 Devise</label>
+                            <select id="devise" name="devise" required>
+                                <option value="FC" selected>🇨🇩 FC (Franc Congolais)</option>
+                                <option value="USD">🇺🇸 USD (Dollar Américain)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
                         <div class="form-group">
                             <label for="quantité">📊 Quantité en stock</label>
                             <input type="number" id="quantité" name="quantité" 
@@ -137,9 +172,8 @@ $conn->close();
     ?>
 </div>
 
-    <script>
-        // Animation des champs au focus
-        document.querySelectorAll('input, textarea').forEach(input => {
+    <script>        // Animation des champs au focus
+        document.querySelectorAll('input, textarea, select').forEach(input => {
             input.addEventListener('focus', function() {
                 this.parentElement.style.transform = 'scale(1.02)';
             });
@@ -149,12 +183,29 @@ $conn->close();
             });
         });
 
-        // Effet de chargement sur le bouton submit
+        // Gestion du changement de devise
+        document.getElementById('devise').addEventListener('change', function() {
+            const prixInput = document.getElementById('prix');
+            const selectedDevise = this.value;
+            
+            if (selectedDevise === 'USD') {
+                prixInput.placeholder = '0.00 (USD)';
+            } else {
+                prixInput.placeholder = '0.00 (FC)';
+            }
+            
+            // Animation du changement
+            prixInput.style.animation = 'pulse 0.3s ease-in-out';
+            setTimeout(() => {
+                prixInput.style.animation = '';
+            }, 300);
+        });        // Effet de chargement sur le bouton submit
         document.querySelector('form').addEventListener('submit', function(e) {
             const submitBtn = this.querySelector('button[type="submit"]');
             const nomField = this.querySelector('#nom');
             const prixField = this.querySelector('#prix');
             const quantiteField = this.querySelector('#quantité');
+            const deviseField = this.querySelector('#devise');
             
             // Validation simple
             if (!nomField.value.trim()) {
@@ -175,6 +226,20 @@ $conn->close();
                 e.preventDefault();
                 quantiteField.focus();
                 alert('⚠️ La quantité ne peut pas être négative');
+                return;
+            }
+            
+            // Confirmation avec détails
+            const devise = deviseField.value;
+            const deviseSymbol = devise === 'USD' ? '$' : 'FC';
+            const confirmMessage = `✅ Confirmer l'ajout de l'article ?\n\n` +
+                                 `📝 Nom: ${nomField.value}\n` +
+                                 `💰 Prix: ${prixField.value} ${deviseSymbol}\n` +
+                                 `📊 Quantité: ${quantiteField.value}\n` +
+                                 `💱 Devise: ${devise}`;
+            
+            if (!confirm(confirmMessage)) {
+                e.preventDefault();
                 return;
             }
             

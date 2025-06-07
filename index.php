@@ -22,13 +22,13 @@ if (isset($_SESSION['message'])) {
 $search = '';
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
     $search = htmlspecialchars($_POST['search']);
-    $stmt = $conn->prepare("SELECT * FROM Articles WHERE nom LIKE ?");
+    $stmt = $conn->prepare("SELECT * FROM Articles WHERE nom LIKE ? ORDER BY nom ASC");
     $search_param = "%$search%";
     $stmt->bind_param("s", $search_param);
     $stmt->execute();
     $result = $stmt->get_result();
 } else {
-    $result = $conn->query("SELECT * FROM Articles");
+    $result = $conn->query("SELECT * FROM Articles ORDER BY nom ASC");
 }
 ?>
 
@@ -51,8 +51,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
     <div class="container">
         <?php
     
-    include 'navbar.php'
-    ?>
+     include 'navbar.php'
+     ?>
         <!-- Header moderne avec navigation -->
         <header class="header">
             <div class="header-content">
@@ -106,9 +106,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
                         echo "</div>";
                         echo "<div class='article-content'>";
                         echo "<h3>" . htmlspecialchars($row['nom']) . "</h3>";
-                        echo "<p class='article-description'>" . htmlspecialchars($row['description']) . "</p>";
-                        echo "<div class='article-meta'>";
-                        echo "<div class='price-tag'>" . number_format($row['prix'], 2) . " FC</div>";
+                        echo "<p class='article-description'>" . htmlspecialchars($row['description']) . "</p>";                        echo "<div class='article-meta'>";
+                        // Afficher le prix avec la devise appropriée selon la colonne devise de la DB
+                        $devise_symbol = isset($row['devise']) && !empty($row['devise']) ? $row['devise'] : '';
+                        echo "<div class='price-tag'>" . number_format($row['prix'], 2) . " " . $devise_symbol . "</div>";
                         echo "<div class='quantity'>Qté: " . $row['quantité'] . "</div>";
                         echo "</div>";
                         echo "<div class='article-actions'>";
@@ -144,16 +145,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php
-                        // Reset result pointer for table view
+                        <?php                        // Reset result pointer for table view
                         if ($search) {
-                            $stmt = $conn->prepare("SELECT * FROM Articles WHERE nom LIKE ?");
+                            $stmt = $conn->prepare("SELECT * FROM Articles WHERE nom LIKE ? ORDER BY nom ASC");
                             $search_param = "%$search%";
                             $stmt->bind_param("s", $search_param);
                             $stmt->execute();
                             $result_table = $stmt->get_result();
                         } else {
-                            $result_table = $conn->query("SELECT * FROM Articles");
+                            $result_table = $conn->query("SELECT * FROM Articles ORDER BY nom ASC");
                         }
                         
                         if ($result_table->num_rows > 0) {
@@ -161,8 +161,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['search'])) {
                                 echo "<tr>";
                                 echo "<td>" . htmlspecialchars($row['id']) . "</td>";
                                 echo "<td>" . htmlspecialchars($row['nom']) . "</td>";
-                                echo "<td>" . htmlspecialchars($row['description']) . "</td>";
-                                echo "<td>" . number_format($row['prix'], 2) . " FC</td>";
+                                echo "<td>" . htmlspecialchars($row['description']) . "</td>";                                // Afficher le prix avec la devise appropriée selon la colonne devise de la DB
+                                $devise_symbol = isset($row['devise']) && !empty($row['devise']) ? $row['devise'] : 'FC';
+                                echo "<td>" . number_format($row['prix'], 2) . " " . $devise_symbol . "</td>";
                                 echo "<td>" . htmlspecialchars($row['quantité']) . "</td>";
                                 echo "<td>";
                                 echo "<a href='modifier.php?id=" . $row['id'] . "' class='action-link'>✏️ Modifier</a> | ";

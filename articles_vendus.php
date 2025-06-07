@@ -50,7 +50,7 @@ if ($date_filter) {
 }
 
 // Récupérer le nombre total pour la pagination
-$count_sql = "SELECT COUNT(*) as total FROM Ventes JOIN Articles ON Ventes.article_id = Articles.id $where_clause";
+$count_sql = "SELECT COUNT(*) as total FROM Ventes JOIN Articles ON Ventes.id_article = Articles.id $where_clause";
 if ($params) {
     $count_stmt = $conn->prepare($count_sql);
     if ($types) $count_stmt->bind_param($types, ...$params);
@@ -64,9 +64,9 @@ $total_pages = ceil($total_items / $items_per_page);
 
 // Récupérer les articles vendus avec pagination
 $sql = "SELECT Ventes.id, Articles.nom, Ventes.quantité, Ventes.prix_unitaire, Ventes.date_vente, 
-               (Ventes.quantité * Ventes.prix_unitaire) as total_vente
+               Ventes.devise, (Ventes.quantité * Ventes.prix_unitaire) as total_vente
         FROM Ventes 
-        JOIN Articles ON Ventes.article_id = Articles.id 
+        JOIN Articles ON Ventes.id_article = Articles.id 
         $where_clause 
         ORDER BY Ventes.date_vente DESC 
         LIMIT ? OFFSET ?";
@@ -80,29 +80,45 @@ if ($types) $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $result = $stmt->get_result();
 
-// Calculer les statistiques pour la période filtrée
-$stats_sql = "SELECT 
-                COUNT(*) as total_ventes,
-                SUM(quantité) as total_articles,
-                SUM(quantité * prix_unitaire) as chiffre_affaires,
-                AVG(quantité * prix_unitaire) as vente_moyenne
-              FROM Ventes 
-              JOIN Articles ON Ventes.article_id = Articles.id 
-              $where_clause";
+// Calculer les statistiques pour la période filtrée (séparées par devise)
+$stats_sql_fc = "SELECT 
+                COUNT(*) as total_ventes_fc,
+                SUM(quantité) as total_articles_fc,
+                SUM(quantité * prix_unitaire) as chiffre_affaires_fc,
+                AVG(quantité * prix_unitaire) as vente_moyenne_fc              FROM Ventes 
+              JOIN Articles ON Ventes.id_article = Articles.id 
+              $where_clause AND (Ventes.devise = 'FC' OR Ventes.devise IS NULL)";
+
+$stats_sql_usd = "SELECT 
+                COUNT(*) as total_ventes_usd,
+                SUM(quantité) as total_articles_usd,
+                SUM(quantité * prix_unitaire) as chiffre_affaires_usd,
+                AVG(quantité * prix_unitaire) as vente_moyenne_usd              FROM Ventes 
+              JOIN Articles ON Ventes.id_article = Articles.id 
+              $where_clause AND Ventes.devise = 'USD'";
 
 if ($search || $date_filter) {
     $stats_params = array_slice($params, 0, -2); // Enlever LIMIT et OFFSET
     $stats_types = substr($types, 0, -2);
     if ($stats_params) {
-        $stats_stmt = $conn->prepare($stats_sql);
-        if ($stats_types) $stats_stmt->bind_param($stats_types, ...$stats_params);
-        $stats_stmt->execute();
-        $stats = $stats_stmt->get_result()->fetch_assoc();
+        // Statistiques FC
+        $stats_stmt_fc = $conn->prepare($stats_sql_fc);
+        if ($stats_types) $stats_stmt_fc->bind_param($stats_types, ...$stats_params);
+        $stats_stmt_fc->execute();
+        $stats_fc = $stats_stmt_fc->get_result()->fetch_assoc();
+        
+        // Statistiques USD
+        $stats_stmt_usd = $conn->prepare($stats_sql_usd);
+        if ($stats_types) $stats_stmt_usd->bind_param($stats_types, ...$stats_params);
+        $stats_stmt_usd->execute();
+        $stats_usd = $stats_stmt_usd->get_result()->fetch_assoc();
     } else {
-        $stats = $conn->query($stats_sql)->fetch_assoc();
+        $stats_fc = $conn->query($stats_sql_fc)->fetch_assoc();
+        $stats_usd = $conn->query($stats_sql_usd)->fetch_assoc();
     }
 } else {
-    $stats = $conn->query($stats_sql)->fetch_assoc();
+    $stats_fc = $conn->query($stats_sql_fc)->fetch_assoc();
+    $stats_usd = $conn->query($stats_sql_usd)->fetch_assoc();
 }
 ?>
 
@@ -149,36 +165,34 @@ if ($search || $date_filter) {
                     <a href="index.php" class="btn btn-secondary">← Retour</a>
                     <button onclick="window.print()" class="btn btn-info">🖨️ Imprimer</button>
                 </div>
-            </div>
-
-            <!-- Statistiques rapides -->
+            </div>            <!-- Statistiques rapides -->
             <div class="sales-stats">
                 <div class="stat-item">
                     <div class="stat-icon">🎯</div>
                     <div class="stat-info">
-                        <div class="stat-number"><?php echo $stats['total_ventes'] ?? 0; ?></div>
-                        <div class="stat-label">Ventes</div>
+                        <div class="stat-number"><?php echo ($stats_fc['total_ventes_fc'] ?? 0) + ($stats_usd['total_ventes_usd'] ?? 0); ?></div>
+                        <div class="stat-label">Ventes totales</div>
                     </div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-icon">📦</div>
                     <div class="stat-info">
-                        <div class="stat-number"><?php echo $stats['total_articles'] ?? 0; ?></div>
+                        <div class="stat-number"><?php echo ($stats_fc['total_articles_fc'] ?? 0) + ($stats_usd['total_articles_usd'] ?? 0); ?></div>
                         <div class="stat-label">Articles vendus</div>
                     </div>
                 </div>
                 <div class="stat-item">
                     <div class="stat-icon">💰</div>
                     <div class="stat-info">
-                        <div class="stat-number"><?php echo number_format($stats['chiffre_affaires'] ?? 0, 2); ?> FC</div>
-                        <div class="stat-label">Chiffre d'affaires</div>
+                        <div class="stat-number"><?php echo number_format($stats_fc['chiffre_affaires_fc'] ?? 0, 2); ?> FC</div>
+                        <div class="stat-label">CA en FC</div>
                     </div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-icon">📊</div>
+                    <div class="stat-icon">💵</div>
                     <div class="stat-info">
-                        <div class="stat-number"><?php echo number_format($stats['vente_moyenne'] ?? 0, 2); ?> FC</div>
-                        <div class="stat-label">Vente moyenne</div>
+                        <div class="stat-number"><?php echo number_format($stats_usd['chiffre_affaires_usd'] ?? 0, 2); ?> USD</div>
+                        <div class="stat-label">CA en USD</div>
                     </div>
                 </div>
             </div>
@@ -234,10 +248,14 @@ if ($search || $date_filter) {
                                         </td>
                                         <td class="quantity">
                                             <span class="quantity-badge"><?php echo $row['quantité']; ?></span>
+                                        </td>                                        <td class="unit-price">
+                                            <?php 
+                                            $devise = isset($row['devise']) && !empty($row['devise']) ? $row['devise'] : 'FC'; 
+                                            echo number_format($row['prix_unitaire'], 2) . ' ' . $devise; 
+                                            ?>
                                         </td>
-                                        <td class="unit-price"><?php echo number_format($row['prix_unitaire'], 2); ?> FC</td>
                                         <td class="total-price">
-                                            <span class="total-amount"><?php echo number_format($row['total_vente'], 2); ?> FC</span>
+                                            <span class="total-amount"><?php echo number_format($row['total_vente'], 2) . ' ' . $devise; ?></span>
                                         </td>
                                         <td class="sale-date">
                                             <div class="date-info">

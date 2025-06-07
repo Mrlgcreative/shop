@@ -9,26 +9,32 @@ if (!isset($_SESSION['user_id'])) {
 
 // Récupérer les ventes avec prepared statement pour la sécurité
 $sql = "SELECT Ventes.id, Articles.nom, Ventes.quantité, Ventes.prix, Ventes.remise,
-               Ventes.prix as total, Ventes.date 
+               Ventes.prix as total, Ventes.date, Ventes.devise 
         FROM Ventes 
         JOIN Articles ON Ventes.id_article = Articles.id 
         ORDER BY Ventes.date DESC";
 $result = $conn->query($sql);
 
-// Calculer le total général
-$total_general = 0;
+// Calculer les totaux par devise
+$total_general_fc = 0;
+$total_general_usd = 0;
 $total_articles = 0;
 if ($result->num_rows > 0) {
     $result_temp = $conn->query($sql);
     while ($row = $result_temp->fetch_assoc()) {
-        $total_general += $row['total'];
+        if ($row['devise'] == 'USD') {
+            $total_general_usd += $row['total'];
+        } else {
+            $total_general_fc += $row['total'];
+        }
         $total_articles += $row['quantité'];
     }
 }
 
-// Calculer les totaux journaliers
+// Calculer les totaux journaliers par devise
 $sql_daily = "SELECT DATE(Ventes.date) as date_jour, 
-                     SUM(Ventes.prix) as total_jour,
+                     SUM(CASE WHEN Ventes.devise = 'FC' THEN Ventes.prix ELSE 0 END) as total_jour_fc,
+                     SUM(CASE WHEN Ventes.devise = 'USD' THEN Ventes.prix ELSE 0 END) as total_jour_usd,
                      COUNT(*) as nombre_ventes,
                      SUM(Ventes.quantité) as articles_vendus
               FROM Ventes 
@@ -317,19 +323,18 @@ $conn->close();
                     <h2>📊 Statistiques Générales</h2>
                     <p class="card-subtitle">Vue d'ensemble des performances de vente</p>
                 </div>
-                <div class="card-body">
-                    <div class="daily-totals-grid">
+                <div class="card-body">                    <div class="daily-totals-grid">
                         <div class="daily-total-item">
                             <div class="daily-date">
                                 <div class="date-main">💰</div>
-                                <div class="weekday">CA Total</div>
+                                <div class="weekday">CA FC</div>
                             </div>
                             <div class="daily-stats">
                                 <div class="daily-amount">
-                                    <span class="amount"><?php echo number_format($total_general, 2); ?> FC</span>
+                                    <span class="amount"><?php echo number_format($total_general_fc, 2); ?> FC</span>
                                 </div>
                                 <div class="daily-details">
-                                    <span class="transactions">Chiffre d'affaires total</span>
+                                    <span class="transactions">Chiffre d'affaires FC</span>
                                 </div>
                             </div>
                             <div class="daily-performance">
@@ -337,6 +342,26 @@ $conn->close();
                                     <div class="performance-fill" style="width: 100%"></div>
                                 </div>
                                 <span class="performance-text">↗️ +15%</span>
+                            </div>
+                        </div>
+                        <div class="daily-total-item">
+                            <div class="daily-date">
+                                <div class="date-main">💵</div>
+                                <div class="weekday">CA USD</div>
+                            </div>
+                            <div class="daily-stats">
+                                <div class="daily-amount">
+                                    <span class="amount"><?php echo number_format($total_general_usd, 2); ?> USD</span>
+                                </div>
+                                <div class="daily-details">
+                                    <span class="transactions">Chiffre d'affaires USD</span>
+                                </div>
+                            </div>
+                            <div class="daily-performance">
+                                <div class="performance-bar">
+                                    <div class="performance-fill" style="width: 85%"></div>
+                                </div>
+                                <span class="performance-text">↗️ +10%</span>
                             </div>
                         </div>
                         <div class="daily-total-item">
@@ -378,15 +403,14 @@ $conn->close();
                                 </div>
                                 <span class="performance-text">↗️ +12%</span>
                             </div>
-                        </div>
-                        <div class="daily-total-item">
+                        </div>                        <div class="daily-total-item">
                             <div class="daily-date">
                                 <div class="date-main">📈</div>
                                 <div class="weekday">Panier</div>
                             </div>
                             <div class="daily-stats">
                                 <div class="daily-amount">
-                                    <span class="amount"><?php echo $result->num_rows > 0 ? number_format($total_general / $result->num_rows, 2) : '0.00'; ?> FC</span>
+                                    <span class="amount"><?php echo $result->num_rows > 0 ? number_format(($total_general_fc + $total_general_usd) / $result->num_rows, 2) : '0.00'; ?> FC</span>
                                 </div>
                                 <div class="daily-details">
                                     <span class="transactions">Panier moyen</span>
@@ -421,10 +445,19 @@ $conn->close();
                                             $weekdays = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
                                             echo $weekdays[date('w', strtotime($daily['date_jour']))]; 
                                         ?></div>
-                                    </div>
-                                    <div class="daily-stats">
+                                    </div>                                    <div class="daily-stats">
                                         <div class="daily-amount">
-                                            <span class="amount"><?php echo number_format($daily['total_jour'], 2); ?> FC</span>
+                                            <?php if ($daily['total_jour_fc'] > 0): ?>
+                                                <span class="amount"><?php echo number_format($daily['total_jour_fc'], 2); ?> FC</span>
+                                            <?php endif; ?>
+                                            <?php if ($daily['total_jour_usd'] > 0): ?>
+                                                <span class="amount" style="<?php echo $daily['total_jour_fc'] > 0 ? 'font-size: 1.2rem; margin-top: 0.2rem; display: block;' : ''; ?>">
+                                                    <?php echo number_format($daily['total_jour_usd'], 2); ?> USD
+                                                </span>
+                                            <?php endif; ?>
+                                            <?php if ($daily['total_jour_fc'] == 0 && $daily['total_jour_usd'] == 0): ?>
+                                                <span class="amount">0.00 FC</span>
+                                            <?php endif; ?>
                                         </div>
                                         <div class="daily-details">
                                             <span class="transactions"><?php echo $daily['nombre_ventes']; ?> vente<?php echo $daily['nombre_ventes'] > 1 ? 's' : ''; ?></span>
@@ -433,8 +466,9 @@ $conn->close();
                                     </div>
                                     <div class="daily-performance">
                                         <?php 
-                                        $avg_daily = $total_general / max(1, $result_daily->num_rows);
-                                        $performance = ($daily['total_jour'] / max(1, $avg_daily)) * 100;
+                                        $total_jour_combined = $daily['total_jour_fc'] + $daily['total_jour_usd']; // Simplification pour le calcul de performance
+                                        $avg_daily = ($total_general_fc + $total_general_usd) / max(1, $result_daily->num_rows);
+                                        $performance = ($total_jour_combined / max(1, $avg_daily)) * 100;
                                         ?>
                                         <div class="performance-bar">
                                             <div class="performance-fill" style="width: <?php echo min(100, $performance); ?>%"></div>
@@ -489,27 +523,32 @@ $conn->close();
                                                 <?php 
                                                 // Calcul du prix unitaire avant remise si une remise a été appliquée
                                                 $prix_unitaire = $row['prix'] / $row['quantité'];
-                                                echo number_format($prix_unitaire, 2); 
-                                                ?> FC
+                                                $devise = isset($row['devise']) ? $row['devise'] : 'FC';
+                                                echo number_format($prix_unitaire, 2) . ' ' . $devise; 
+                                                ?>
                                             </td>                                            <td class="discount">
                                                 <?php 
                                                 if (!empty($row['remise'])) {
-                                                    // Calculer le montant de la remise en FC
+                                                    // Calculer le montant de la remise
                                                     $pourcentage_remise = floatval(str_replace('%', '', $row['remise']));
                                                     $prix_unitaire = $row['prix'] / $row['quantité'];
                                                     
                                                     // Retrouver le prix unitaire avant remise
                                                     $prix_avant_remise = $prix_unitaire / (1 - ($pourcentage_remise / 100));
                                                     $montant_remise = ($prix_avant_remise * $row['quantité'] * $pourcentage_remise) / 100;
+                                                    $devise = isset($row['devise']) ? $row['devise'] : 'FC';
                                                     
-                                                    echo number_format($montant_remise, 2) . ' FC';
+                                                    echo number_format($montant_remise, 2) . ' ' . $devise;
                                                 } else {
                                                     echo '-';
                                                 }
                                                 ?>
                                             </td>
                                             <td class="total-amount">
-                                                <?php echo number_format($row['total'], 2); ?> FC
+                                                <?php 
+                                                $devise = isset($row['devise']) ? $row['devise'] : 'FC';
+                                                echo number_format($row['total'], 2) . ' ' . $devise; 
+                                                ?>
                                             </td>
                                             <td class="date-time">
                                                 <div class="date"><?php echo date('d/m/Y', strtotime($row['date'])); ?></div>
